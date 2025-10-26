@@ -4,13 +4,15 @@ Simple Hello World AI Agent using LangGraph
 from typing import TypedDict, Annotated
 from langgraph.graph import StateGraph, END
 from langchain_openai import ChatOpenAI
-from langchain_core.messages import HumanMessage, AIMessage
+from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 import operator
+
+from langgraph.graph.message import AnyMessage
 
 
 class AgentState(TypedDict):
     """State for the Hello World agent"""
-    messages: Annotated[list, operator.add]
+    messages: Annotated[list[AnyMessage], operator.add]
     user_input: str
     response: str
 
@@ -18,9 +20,11 @@ class AgentState(TypedDict):
 class HelloWorldAgent:
     """A simple Hello World AI agent using LangGraph"""
     
-    def __init__(self, model_name: str = "gpt-3.5-turbo"):
+    def __init__(self, model_name: str = "gpt-3.5-turbo", system_prompt: str = None):
         """Initialize the agent with OpenAI model"""
         self.llm = ChatOpenAI(model=model_name, temperature=0.7)
+        # Set default system prompt if none provided
+        self.system_prompt = system_prompt or "You are a helpful AI companion that assists users with their questions and tasks."
         self.graph = self._build_graph()
     
     def _build_graph(self) -> StateGraph:
@@ -44,14 +48,9 @@ class HelloWorldAgent:
         """Process the user input"""
         user_input = state["user_input"]
         
-        # Add user message to conversation
-        messages = state.get("messages", [])
-        messages.append(HumanMessage(content=user_input))
-        
         return {
-            "messages": messages,
+            "messages": [HumanMessage(content=user_input)],
             "user_input": user_input,
-            "response": ""
         }
     
     def _generate_response(self, state: AgentState) -> AgentState:
@@ -61,12 +60,8 @@ class HelloWorldAgent:
         # Generate response using LLM
         response = self.llm.invoke(messages)
         
-        # Add AI message to conversation
-        messages.append(AIMessage(content=response.content))
-        
         return {
-            "messages": messages,
-            "user_input": state["user_input"],
+            "messages": [AIMessage(content=response.content)],
             "response": response.content
         }
     
@@ -78,8 +73,6 @@ class HelloWorldAgent:
         formatted_response = f"🤖 Hello! {response}"
         
         return {
-            "messages": state["messages"],
-            "user_input": state["user_input"],
             "response": formatted_response
         }
     
