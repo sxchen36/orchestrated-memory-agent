@@ -1,30 +1,34 @@
 """
-Simple Hello World AI Agent using LangGraph
+AI Companion Agent using LangGraph
 """
 from typing import TypedDict, Annotated
 from langgraph.graph import StateGraph, END
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
+from langgraph.checkpoint.memory import InMemorySaver
 import operator
+import json
 
 from langgraph.graph.message import AnyMessage
+import utils
 
 
 class AgentState(TypedDict):
-    """State for the Hello World agent"""
+    """State for the Companion agent"""
     messages: Annotated[list[AnyMessage], operator.add]
     user_input: str
     response: str
+    summary: str
 
-
-class HelloWorldAgent:
-    """A simple Hello World AI agent using LangGraph"""
+class CompanionAgent:
+    """An AI Companion agent using LangGraph"""
     
     def __init__(self, model_name: str = "gpt-3.5-turbo", system_prompt: str = None):
         """Initialize the agent with OpenAI model"""
         self.llm = ChatOpenAI(model=model_name, temperature=0.7)
         # Set default system prompt if none provided
         self.system_prompt = system_prompt or "You are a helpful AI companion that assists users with their questions and tasks."
+        self.in_memory_saver = InMemorySaver()
         self.graph = self._build_graph()
     
     def _build_graph(self) -> StateGraph:
@@ -35,14 +39,19 @@ class HelloWorldAgent:
         workflow.add_node("process_input", self._process_input)
         workflow.add_node("generate_response", self._generate_response)
         workflow.add_node("format_output", self._format_output)
+        workflow.add_node("summarize_context", self.summarize_context)
         
         # Add edges
         workflow.set_entry_point("process_input")
         workflow.add_edge("process_input", "generate_response")
         workflow.add_edge("generate_response", "format_output")
-        workflow.add_edge("format_output", END)
+        workflow.add_conditional_edges("generate_response", self.should_summarize, {
+            True: "summarize_context",
+            False: END,
+        })
+        workflow.add_edge("generate_response", "format_output")
         
-        return workflow.compile()
+        return workflow.compile(checkpointer=self.in_memory_saver)
     
     def _process_input(self, state: AgentState) -> AgentState:
         """Process the user input"""
@@ -75,6 +84,27 @@ class HelloWorldAgent:
         return {
             "response": formatted_response
         }
+
+    def summarize_context(self,state: AgentState):
+        conversation_text = "\n".join(
+            [f"{m.type}: {m.content}" for m in state["messages"]]
+        )
+        prompt = (
+            f"Summarize this conversation in under 80 words. "
+            f"Keep track of key facts, goals, or changes:\n\n{conversation_text}\n\n"
+        )
+        summary_msg = self.llm.invoke([SystemMessage(content=prompt)])
+
+        state_to_print = utils.serialize_agent_state(state)
+        print(f"screenshot of current state: {json.dumps(state_to_print, indent=4)}")
+        
+        print(f"adding summary: {summary_msg.content}")
+        return {
+            "summary": summary_msg.content
+        }
+
+    def should_summarize(self, state: AgentState):
+        return len(state["messages"]) % 10 == 0  # every 5 user+AI pairs
     
     def run(self, user_input: str) -> str:
         """Run the agent with user input"""
@@ -83,8 +113,14 @@ class HelloWorldAgent:
             "user_input": user_input,
             "response": ""
         }
+        memory_thread = {
+            "configurable": {"thread_id": "companion_thread"},
+        }
         
-        result = self.graph.invoke(initial_state)
+        result = self.graph.invoke(
+            initial_state,
+            memory_thread
+            )
         return result["response"]
 
 
@@ -102,9 +138,9 @@ def main():
         return
     
     # Initialize the agent
-    agent = HelloWorldAgent()
+    agent = CompanionAgent()
     
-    print("🤖 Hello World AI Agent is ready!")
+    print("🤖 AI Companion is ready!")
     print("Type 'quit' to exit\n")
     
     while True:

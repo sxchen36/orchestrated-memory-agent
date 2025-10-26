@@ -1,7 +1,7 @@
 """
-Main entry point for the Hello World AI Agent
+Main entry point for the AI Companion Agent
 """
-from agent import HelloWorldAgent
+from agent import CompanionAgent
 import os
 from dotenv import load_dotenv
 
@@ -18,10 +18,10 @@ def main():
         return
     
     # Initialize the agent
-    print("🚀 Initializing Hello World AI Agent...")
-    agent = HelloWorldAgent()
+    print("🚀 Initializing AI Companion...")
+    agent = CompanionAgent()
     
-    print("🤖 Hello World AI Agent is ready!")
+    print("🤖 AI Companion is ready!")
     print("Type 'quit' to exit\n")
     
     while True:

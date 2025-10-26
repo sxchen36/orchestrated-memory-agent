@@ -60,6 +60,14 @@ flowchart LR
     class C db;
 ```
 
+## Features
+
+- 🤖 Conversational AI agent using LangGraph
+- 💾 In-memory state management with automatic checkpointing
+- 📝 Automatic conversation summarization (every 10 messages)
+- 🔄 Workflow orchestration with conditional edges
+- 💬 Context-aware responses using conversation history
+
 ## Prerequisites
 
 - Python 3.8+
@@ -99,18 +107,44 @@ python agent.py
 
 ## How it Works
 
-The agent uses LangGraph to create a simple workflow:
+The agent uses LangGraph to create a workflow with memory and automatic summarization:
 
-1. **Process Input**: Takes user input and adds it to the conversation
-2. **Generate Response**: Uses OpenAI's GPT model to generate a response
+1. **Process Input**: Takes user input and creates a HumanMessage
+2. **Generate Response**: Uses OpenAI's GPT model to generate a contextual response based on conversation history
 3. **Format Output**: Formats the response with a friendly greeting
+4. **Summarize Context** (conditional): Every 10 messages (5 conversation turns), automatically summarizes the conversation to maintain long-term context
+
+### Graph Flow
+```mermaid
+flowchart TD
+    START([Start]) --> process[Process Input]
+    process --> generate[Generate Response]
+    generate --> format[Format Output]
+    generate -->|Every 10 msgs| summarize[Summarize Context]
+    format --> END([End])
+    summarize --> format
+    
+    style process fill:#e6f3ff
+    style generate fill:#e6f3ff
+    style format fill:#e6f3ff
+    style summarize fill:#fff3e6
+```
 
 ## Project Structure
 
 ```
-├── agent.py          # Main agent implementation
+├── agent.py          # Main Companion Agent implementation
 ├── main.py           # Entry point
+├── utils.py          # Utility functions (state serialization)
 ├── requirements.txt  # Python dependencies
-├── .env.example      # Environment variables template
+├── .env              # Environment variables (not in git)
 └── README.md         # This file
 ```
+
+## State Management
+
+The agent uses LangGraph's `InMemorySaver` to maintain conversation state and memory across interactions. The state includes:
+- **messages**: Conversation history (HumanMessage, AIMessage)
+- **user_input**: Current user input
+- **response**: Generated AI response
+- **summary**: Periodic conversation summaries (every 10 messages)
